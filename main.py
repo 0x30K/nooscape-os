@@ -55,30 +55,33 @@ def main():
     # Initialize database
     db = Database("nooscape.db")
 
-    # Load or create world
-    world = None
-    if not args.fresh:
-        world = db.load_latest()
-        if world:
-            console.print(f"[green]Resumed from tick {world.tick} with {len(world.get_living_agents())} living agents[/green]")
+    try:
+        # Load or create world
+        world = None
+        if not args.fresh:
+            world = db.load_latest()
+            if world:
+                console.print(f"[green]Resumed from tick {world.tick} with {len(world.get_living_agents())} living agents[/green]")
 
-    if world is None:
-        world = initialize_world()
-        db.save_snapshot(world)
-        console.print(f"[cyan]Created new world with {len(world.agents)} genesis agents[/cyan]")
+        if world is None:
+            world = initialize_world()
+            db.save_snapshot(world)
+            console.print(f"[cyan]Created new world with {len(world.agents)} genesis agents[/cyan]")
 
-    # Tick delay
-    tick_delay = config.WATCH_TICK_DELAY if args.watch else config.FAST_TICK_DELAY
+        # Tick delay
+        tick_delay = config.WATCH_TICK_DELAY if args.watch else config.FAST_TICK_DELAY
 
-    # Event buffer for display
-    recent_events = []
+        # Event buffer for display
+        recent_events = []
 
-    if args.watch:
-        _run_watch_mode(world, db, tick_delay, recent_events, console)
-    else:
-        _run_fast_mode(world, db, tick_delay, recent_events, console)
+        if args.watch:
+            _run_watch_mode(world, db, tick_delay, recent_events, console)
+        else:
+            _run_fast_mode(world, db, tick_delay, recent_events, console)
 
-    db.close()
+    finally:
+        db.close()
+
     console.print("\n[yellow]Nooscape stopped.[/yellow]")
 
 
