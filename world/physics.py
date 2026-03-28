@@ -113,8 +113,11 @@ def process_bounty_payouts(world: WorldState, completions: list = None) -> World
             continue
 
         agent = new_world.agents.get(bounty.claimed_by)
-        if agent is None:
+        if agent is None or not agent.alive:
             continue
+
+        if new_world.gravity_pool < bounty.reward:
+            continue  # skip — pool is insolvent for this bounty
 
         # Transfer reward from gravity_pool to agent
         agent.tokens += bounty.reward
@@ -151,7 +154,7 @@ def process_service_transactions(world: WorldState, fulfillments: list = None) -
 
         provider = new_world.agents.get(provider_id)
         buyer = new_world.agents.get(buyer_id)
-        if provider is None or buyer is None:
+        if provider is None or not provider.alive or buyer is None or not buyer.alive:
             continue
 
         # Skip if buyer can't afford it

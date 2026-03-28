@@ -348,6 +348,151 @@ class TestReputation:
         assert new_world.agents["a1"].reputation == 1.0
 
 
+class TestBountyPayoutsGuards:
+    def _make_world_with_bounty(self, reward=20.0, status="claimed", agent_alive=True, gravity_pool=50.0):
+        world = create_world()
+        agent = create_agent("a1", "Ada-0", tokens=10.0)
+        agent.alive = agent_alive
+        world.agents["a1"] = agent
+        world.gravity_pool = gravity_pool
+        bounty = Bounty(
+            id="b1",
+            description="do something",
+            reward=reward,
+            posted_by="human",
+            posted_tick=0,
+            expires_at_tick=100,
+            status=status,
+            claimed_by="a1",
+        )
+        world.bounties["b1"] = bounty
+        return world
+
+    def test_bounty_payout_skips_when_pool_insufficient(self):
+        """Payout is skipped when gravity_pool < bounty.reward."""
+        world = self._make_world_with_bounty(reward=50.0, gravity_pool=10.0)
+
+        new_world = process_bounty_payouts(world, completions=["b1"])
+
+        assert new_world.bounties["b1"].status == "claimed"
+        assert new_world.gravity_pool == pytest.approx(10.0)
+        assert new_world.agents["a1"].tokens == pytest.approx(10.0)
+
+    def test_bounty_payout_skips_dead_agent(self):
+        """Payout is skipped when the completing agent is dead."""
+        world = self._make_world_with_bounty(reward=20.0, agent_alive=False, gravity_pool=50.0)
+
+        new_world = process_bounty_payouts(world, completions=["b1"])
+
+        assert new_world.bounties["b1"].status == "claimed"
+        assert new_world.gravity_pool == pytest.approx(50.0)
+        assert new_world.agents["a1"].tokens == pytest.approx(10.0)
+
+
+class TestServiceTransactionGuards:
+    def _make_world_with_service(self, price=15.0, buyer_tokens=20.0, status="claimed",
+                                  provider_alive=True, buyer_alive=True):
+        world = create_world()
+        provider = create_agent("provider", "Pro-0", tokens=5.0)
+        provider.alive = provider_alive
+        buyer = create_agent("buyer", "Buy-0", tokens=buyer_tokens)
+        buyer.alive = buyer_alive
+        world.agents["provider"] = provider
+        world.agents["buyer"] = buyer
+        service = ServiceListing(
+            id="s1",
+            provider_id="provider",
+            description="some service",
+            price=price,
+            status=status,
+            buyer_id="buyer",
+        )
+        world.services["s1"] = service
+        return world
+
+    def test_service_transaction_skips_dead_party(self):
+        """Transaction is skipped when provider is dead."""
+        world = self._make_world_with_service(price=15.0, buyer_tokens=20.0, provider_alive=False)
+
+        new_world = process_service_transactions(world, fulfillments=[("s1", "provider", "buyer")])
+
+        assert new_world.services["s1"].status == "claimed"
+        assert new_world.agents["provider"].tokens == pytest.approx(5.0)
+        assert new_world.agents["buyer"].tokens == pytest.approx(20.0)
+        assert new_world.total_services_fulfilled == 0
+
+    def test_service_transaction_skips_dead_buyer(self):
+        """Transaction is skipped when buyer is dead."""
+        world = self._make_world_with_service(price=15.0, buyer_tokens=20.0, buyer_alive=False)
+
+        new_world = process_service_transactions(world, fulfillments=[("s1", "provider", "buyer")])
+
+        assert new_world.services["s1"].status == "claimed"
+        assert new_world.agents["provider"].tokens == pytest.approx(5.0)
+        assert new_world.agents["buyer"].tokens == pytest.approx(20.0)
+        assert new_world.total_services_fulfilled == 0
+
+
+class TestExpireBounties:
+    def _make_world_with_bounty(self, status="open", expires_at_tick=5, tick=5, reward=10.0):
+        world = create_world()
+        world.tick = tick
+        world.gravity_pool = 100.0
+        bounty = Bounty(
+            id="b1",
+            description="test bounty",
+            reward=reward,
+            posted_by="human",
+            posted_tick=0,
+            expires_at_tick=expires_at_tick,
+            status=status,
+            claimed_by=None,
+        )
+        world.bounties["b1"] = bounty
+        return world
+
+    def test_expires_open_bounty_past_deadline(self):
+        """Open bounty with expires_at_tick <= world.tick becomes 'expired'."""
+        world = self._make_world_with_bounty(status="open", expires_at_tick=5, tick=5)
+
+        new_world = expire_bounties(world)
+
+        assert new_world.bounties["b1"].status == "expired"
+
+    def test_returns_reward_to_gravity_pool(self):
+        """Expired bounty's reward is added back to gravity_pool."""
+        world = self._make_world_with_bounty(status="open", expires_at_tick=5, tick=5, reward=10.0)
+
+        new_world = expire_bounties(world)
+
+        assert new_world.gravity_pool == pytest.approx(110.0)
+
+    def test_does_not_expire_claimed_bounty(self):
+        """Claimed bounty is NOT expired even past deadline."""
+        world = self._make_world_with_bounty(status="claimed", expires_at_tick=5, tick=10)
+
+        new_world = expire_bounties(world)
+
+        assert new_world.bounties["b1"].status == "claimed"
+
+    def test_does_not_expire_before_deadline(self):
+        """Bounty with expires_at_tick > world.tick stays 'open'."""
+        world = self._make_world_with_bounty(status="open", expires_at_tick=10, tick=5)
+
+        new_world = expire_bounties(world)
+
+        assert new_world.bounties["b1"].status == "open"
+
+    def test_expire_bounties_immutable(self):
+        """Original world is not mutated by expire_bounties."""
+        world = self._make_world_with_bounty(status="open", expires_at_tick=5, tick=5)
+
+        expire_bounties(world)
+
+        assert world.bounties["b1"].status == "open"
+        assert world.gravity_pool == pytest.approx(100.0)
+
+
 class TestDeathSetsLifespan:
     def test_death_sets_lifespan(self):
         """When agent dies, lifespan = died_tick - born_tick."""
