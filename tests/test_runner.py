@@ -67,7 +67,9 @@ class TestRunTick:
         for seed in range(200):
             random.seed(seed)
             test_world = create_world()
-            test_world.agents["a1"] = create_agent("a1", "Ada-0", tokens=50.0)
+            agent = create_agent("a1", "Ada-0", tokens=50.0)
+            agent.reputation = config.GRADUATION_THRESHOLD  # Phase 1: reputation gate
+            test_world.agents["a1"] = agent
             new_world, events = run_tick(test_world)
             if len(new_world.agents) > 1:
                 child_created = True
