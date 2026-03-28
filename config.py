@@ -1,0 +1,22 @@
+"""Nooscape — tunable constants for the world physics."""
+
+# Physics
+ENTROPY_COST_PER_TICK = 0.5       # tokens drained per agent per tick
+SUN_TOKENS_PER_TICK = 10.0        # total new tokens minted per tick
+
+# Agents
+STARTING_TOKENS = 20.0            # tokens each genesis agent starts with
+WORK_REWARD = 2.0                 # tokens earned when an agent works
+DANGER_THRESHOLD = 5.0            # below this, agent will always work
+REPRODUCE_THRESHOLD = 30.0        # above this, agent may reproduce
+REPRODUCE_CHANCE = 0.10           # 10% chance to reproduce when above threshold
+
+# Reproduction
+REPRODUCTION_COST = 15.0          # tokens parent spends to reproduce
+CHILD_STARTING_TOKENS = 10.0      # tokens the child starts with
+
+# Simulation
+GENESIS_AGENT_COUNT = 10          # number of agents at world creation
+SNAPSHOT_INTERVAL = 10            # save to SQLite every N ticks
+FAST_TICK_DELAY = 0.01            # seconds between ticks in fast mode
+WATCH_TICK_DELAY = 1.0            # seconds between ticks in watch mode
