@@ -2,6 +2,7 @@
 
 Orchestrates physics ticks, agent decisions, and action processing.
 """
+import copy
 import uuid
 from world.state import WorldState, create_agent, create_world
 from world.physics import process_tick, apply_entropy, distribute_sun, check_deaths
@@ -66,7 +67,6 @@ def run_tick(world: WorldState) -> tuple:
 
     # 2. Agent decisions and action processing — decisions based on post-entropy tokens
     # Build a view of each agent with post-entropy tokens for think()
-    import copy
     living = new_world.get_living_agents()
     children_to_add = []
 
