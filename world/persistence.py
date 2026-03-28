@@ -192,8 +192,8 @@ def get_bounty_history(db_path: str = "nooscape.db", limit: int = 20) -> list:
     Returns list of event dicts: {tick, event_type, agent_id, details}
     Sorted by tick descending (most recent first).
     """
-    conn = __import__("sqlite3").connect(db_path)
-    conn.row_factory = __import__("sqlite3").Row
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
     try:
         rows = conn.execute(
             """SELECT tick, event_type, agent_id, details
