@@ -143,19 +143,18 @@ class TestProcessTick:
 
         assert new_world.tick == 1
 
-    def test_applies_entropy_then_sun_then_deaths(self):
-        """An agent with exactly ENTROPY_COST tokens should die after entropy
-        but the sun might save them if there are few enough agents."""
+    def test_applies_entropy_then_deaths_then_sun(self):
+        """An agent with exactly ENTROPY_COST tokens is drained to 0 and dies
+        BEFORE sun is distributed. Starvation kills before sunlight can rescue."""
         world = create_world()
-        # Agent has exactly entropy cost — after drain it's 0, but sun adds tokens
+        # Agent has exactly entropy cost — after drain it hits 0, dies before sun
         world.agents["a1"] = create_agent("a1", "Ada-0", tokens=config.ENTROPY_COST_PER_TICK)
 
         new_world = process_tick(world)
 
-        # Entropy drains to 0, sun adds SUN_TOKENS_PER_TICK (only 1 agent gets it all)
-        # Then death check: agent has SUN_TOKENS_PER_TICK, so survives
-        assert new_world.agents["a1"].alive is True
-        assert new_world.agents["a1"].tokens == config.SUN_TOKENS_PER_TICK
+        # Entropy drains to 0, death check fires at 0 (before sun), agent dies
+        assert new_world.agents["a1"].alive is False
+        assert new_world.agents["a1"].tokens == 0.0
 
     def test_does_not_mutate_original(self):
         world = create_world()

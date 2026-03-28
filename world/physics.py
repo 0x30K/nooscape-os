@@ -72,11 +72,14 @@ def check_deaths(world: WorldState) -> WorldState:
 def process_tick(world: WorldState) -> WorldState:
     """Process one full tick of world physics.
 
-    Order: entropy → sun → deaths → increment tick.
+    Order: entropy → deaths → sun → increment tick.
+
+    Deaths happen BEFORE sun so that an agent who cannot afford entropy
+    starves before sunlight can rescue them. This is what makes scarcity real.
     Returns a new WorldState. Never mutates the input.
     """
     new_world = apply_entropy(world)
-    new_world = distribute_sun(new_world)
     new_world = check_deaths(new_world)
+    new_world = distribute_sun(new_world)
     new_world.tick = world.tick + 1
     return new_world

@@ -48,10 +48,10 @@ def run_tick(world: WorldState) -> tuple:
         if agent.alive
     }
 
-    # Sun, deaths, tick increment
-    after_sun = distribute_sun(after_entropy)
-    after_deaths = check_deaths(after_sun)
-    new_world = after_deaths
+    # Deaths happen BEFORE sun: starvation kills before sunlight can rescue
+    after_deaths = check_deaths(after_entropy)
+    after_sun = distribute_sun(after_deaths)
+    new_world = after_sun
     new_world.tick = world.tick + 1
 
     # Record deaths from physics

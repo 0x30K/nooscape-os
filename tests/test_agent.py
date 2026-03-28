@@ -16,8 +16,9 @@ class TestThink:
 
         assert action == "work"
 
-    def test_works_when_tokens_at_danger(self):
-        agent = create_agent("a1", "Ada-0", tokens=config.DANGER_THRESHOLD)
+    def test_works_when_tokens_just_below_danger(self):
+        """Agent works when tokens are strictly below the danger threshold."""
+        agent = create_agent("a1", "Ada-0", tokens=config.DANGER_THRESHOLD - 1.0)
         world = create_world()
         world.agents["a1"] = agent
 
@@ -25,19 +26,20 @@ class TestThink:
 
         assert action == "work"
 
-    def test_rests_when_tokens_moderate(self):
-        """With tokens between danger and reproduce threshold, agent rests."""
+    def test_works_when_tokens_moderate(self):
+        """Agent works even at moderate token levels (danger threshold > reproduce
+        threshold means agents work continuously until wealthy enough to reproduce)."""
         agent = create_agent("a1", "Ada-0", tokens=15.0)
         world = create_world()
         world.agents["a1"] = agent
 
         action = think(agent, world)
 
-        assert action == "rest"
+        assert action == "work"
 
     def test_can_reproduce_when_wealthy(self):
-        """With tokens above threshold and favorable random, agent reproduces."""
-        agent = create_agent("a1", "Ada-0", tokens=35.0)
+        """With tokens above danger threshold and favorable random, agent reproduces."""
+        agent = create_agent("a1", "Ada-0", tokens=config.DANGER_THRESHOLD + 5.0)
         world = create_world()
         world.agents["a1"] = agent
 

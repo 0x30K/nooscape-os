@@ -48,14 +48,16 @@ class TestRunTick:
         assert isinstance(events, list)
 
     def test_agents_can_work(self):
-        """An agent in the danger zone should work and gain tokens."""
+        """An agent below the danger threshold should work and gain tokens."""
         world = create_world()
-        world.agents["a1"] = create_agent("a1", "Ada-0", tokens=3.0)
+        world.agents["a1"] = create_agent("a1", "Ada-0", tokens=5.0)
 
         new_world, events = run_tick(world)
 
-        # After entropy (3.0 - 0.5 = 2.5), sun (+ 10.0 = 12.5), work (+ 2.0 = 14.5)
-        assert new_world.agents["a1"].tokens == pytest.approx(14.5)
+        # Entropy: 5.0 - 4.0 = 1.0. Death check: 1.0 > 0, alive.
+        # Sun (1 agent): 1.0 + 30.0 = 31.0. Post-entropy (1.0) < danger (35): work.
+        # Work: 31.0 + 1.5 = 32.5
+        assert new_world.agents["a1"].tokens == pytest.approx(32.5)
 
     def test_reproduction_creates_child(self):
         """Force a reproduction by giving agent high tokens and seeding random."""
