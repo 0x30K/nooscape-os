@@ -13,7 +13,7 @@ REPRODUCE_CHANCE = 0.10           # 10% chance to reproduce when above threshold
 
 # Reproduction
 REPRODUCTION_COST = 15.0          # tokens parent spends to reproduce
-CHILD_STARTING_TOKENS = 15.0      # tokens the child starts with (just above danger threshold)
+CHILD_STARTING_TOKENS = 15.0      # tokens the child starts with (below danger threshold — child must work immediately)
 
 # Simulation
 GENESIS_AGENT_COUNT = 10          # number of agents at world creation

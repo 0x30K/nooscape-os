@@ -45,10 +45,10 @@ class Agent:
             id=d["id"],
             name=d["name"],
             tokens=d["tokens"],
-            alive=d["alive"],
-            born_tick=d["born_tick"],
+            alive=d.get("alive", True),
+            born_tick=d.get("born_tick", 0),
             died_tick=d.get("died_tick"),
-            generation=d["generation"],
+            generation=d.get("generation", 0),
             parent_id=d.get("parent_id"),
             reputation=d.get("reputation", 0.0),
             work_count=d.get("work_count", 0),
@@ -149,11 +149,11 @@ class ServiceListing:
 class WorldState:
     """The complete state of the world at a given tick."""
     tick: int = 0
-    agents: dict = field(default_factory=dict)  # dict[str, Agent]
+    agents: dict[str, "Agent"] = field(default_factory=dict)
     total_tokens_minted: float = 0.0
     total_tokens_burned: float = 0.0
-    bounties: dict = field(default_factory=dict)  # dict[str, Bounty]
-    services: dict = field(default_factory=dict)  # dict[str, ServiceListing]
+    bounties: dict[str, "Bounty"] = field(default_factory=dict)
+    services: dict[str, "ServiceListing"] = field(default_factory=dict)
     gravity_pool: float = 0.0
     total_gravity_tokens: float = 0.0
     total_bounties_completed: int = 0
@@ -191,8 +191,8 @@ class WorldState:
         return cls(
             tick=d["tick"],
             agents=agents,
-            total_tokens_minted=d["total_tokens_minted"],
-            total_tokens_burned=d["total_tokens_burned"],
+            total_tokens_minted=d.get("total_tokens_minted", 0.0),
+            total_tokens_burned=d.get("total_tokens_burned", 0.0),
             bounties=bounties,
             services=services,
             gravity_pool=d.get("gravity_pool", 0.0),

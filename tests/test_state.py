@@ -62,11 +62,7 @@ class TestWorldState:
         )
         d = agent.to_dict()
         restored = Agent.from_dict(d)
-        assert restored.id == agent.id
-        assert restored.name == agent.name
-        assert restored.tokens == agent.tokens
-        assert restored.generation == agent.generation
-        assert restored.parent_id == agent.parent_id
+        assert restored == agent  # dataclasses support __eq__ by default
 
     def test_world_to_dict_roundtrip(self):
         world = create_world()
@@ -74,12 +70,24 @@ class TestWorldState:
         world.agents["a1"] = agent
         world.tick = 42
         world.total_tokens_minted = 100.0
+        world.total_tokens_burned = 7.5
+        service = ServiceListing(
+            id="s1",
+            provider_id="a1",
+            description="Translation service",
+            price=3.0,
+        )
+        world.services["s1"] = service
         d = world.to_dict()
         restored = WorldState.from_dict(d)
         assert restored.tick == 42
         assert restored.total_tokens_minted == 100.0
+        assert restored.total_tokens_burned == 7.5
         assert "a1" in restored.agents
         assert restored.agents["a1"].name == "Ada-0"
+        assert "s1" in restored.services
+        assert restored.services["s1"].description == "Translation service"
+        assert restored.services["s1"].price == 3.0
 
 
 class TestPhase1Fields:
