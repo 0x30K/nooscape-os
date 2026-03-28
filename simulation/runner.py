@@ -5,7 +5,7 @@ Orchestrates physics ticks, agent decisions, and action processing.
 import copy
 import uuid
 from world.state import WorldState, create_agent, create_world
-from world.physics import process_tick, apply_entropy, distribute_sun, check_deaths
+from world.physics import process_tick, apply_entropy, distribute_radiance, distribute_sun, check_deaths
 from agents.agent import think, generate_name, generate_child_name
 import config
 
@@ -50,7 +50,7 @@ def run_tick(world: WorldState) -> tuple:
 
     # Deaths happen BEFORE sun: starvation kills before sunlight can rescue
     after_deaths = check_deaths(after_entropy)
-    after_sun = distribute_sun(after_deaths)
+    after_sun = distribute_radiance(after_deaths)
     new_world = after_sun
     new_world.tick = world.tick + 1
 

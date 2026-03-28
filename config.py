@@ -2,7 +2,7 @@
 
 # Physics
 ENTROPY_COST_PER_TICK = 4.0       # tokens drained per agent per tick
-SUN_TOKENS_PER_TICK = 30.0        # total new tokens minted per tick
+RADIANCE_PER_TICK = 30.0          # total new tokens minted per tick
 
 # Agents
 STARTING_TOKENS = 50.0            # tokens each genesis agent starts with (above reproduce threshold)

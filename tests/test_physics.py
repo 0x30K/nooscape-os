@@ -3,8 +3,18 @@
 Every test verifies purity: same input → same output, no side effects.
 """
 import pytest
-from world.state import create_agent, create_world, WorldState
-from world.physics import apply_entropy, distribute_sun, check_deaths, process_tick
+from world.state import create_agent, create_world, WorldState, Bounty, ServiceListing
+from world.physics import (
+    apply_entropy,
+    distribute_sun,
+    distribute_radiance,
+    check_deaths,
+    process_tick,
+    process_bounty_payouts,
+    process_service_transactions,
+    apply_reputation,
+    expire_bounties,
+)
 import config
 
 
@@ -64,7 +74,7 @@ class TestDistributeSun:
 
         new_world = distribute_sun(world)
 
-        expected_each = config.SUN_TOKENS_PER_TICK / 2
+        expected_each = config.RADIANCE_PER_TICK / 2
         assert new_world.agents["a1"].tokens == 10.0 + expected_each
         assert new_world.agents["a2"].tokens == 10.0 + expected_each
 
@@ -74,7 +84,7 @@ class TestDistributeSun:
 
         new_world = distribute_sun(world)
 
-        assert new_world.total_tokens_minted == config.SUN_TOKENS_PER_TICK
+        assert new_world.total_tokens_minted == config.RADIANCE_PER_TICK
 
     def test_no_agents_no_distribution(self):
         world = create_world()
@@ -93,7 +103,7 @@ class TestDistributeSun:
 
         new_world = distribute_sun(world)
 
-        assert new_world.agents["a1"].tokens == 10.0 + config.SUN_TOKENS_PER_TICK
+        assert new_world.agents["a1"].tokens == 10.0 + config.RADIANCE_PER_TICK
         assert new_world.agents["a2"].tokens == 5.0
 
     def test_does_not_mutate_original(self):
@@ -164,3 +174,190 @@ class TestProcessTick:
 
         assert world.tick == 0
         assert world.agents["a1"].tokens == 20.0
+
+
+class TestWorkWeightedRadiance:
+    def test_work_weighted_radiance_distributes_more_to_workers(self):
+        """Agent with weight 3.0 gets more radiance than agent with weight 1.0."""
+        world = create_world()
+        world.agents["a1"] = create_agent("a1", "Ada-0", tokens=10.0)
+        world.agents["a2"] = create_agent("a2", "Rex-0", tokens=10.0)
+
+        work_weights = {"a1": 3.0, "a2": 1.0}
+        new_world = distribute_radiance(world, work_weights)
+
+        # a1 gets 3/4 of RADIANCE_PER_TICK, a2 gets 1/4
+        assert new_world.agents["a1"].tokens > new_world.agents["a2"].tokens
+        assert new_world.agents["a1"].tokens == pytest.approx(10.0 + config.RADIANCE_PER_TICK * 0.75)
+        assert new_world.agents["a2"].tokens == pytest.approx(10.0 + config.RADIANCE_PER_TICK * 0.25)
+
+    def test_work_weighted_radiance_fallback_when_no_work(self):
+        """Equal split when all weights are 0."""
+        world = create_world()
+        world.agents["a1"] = create_agent("a1", "Ada-0", tokens=10.0)
+        world.agents["a2"] = create_agent("a2", "Rex-0", tokens=10.0)
+
+        work_weights = {"a1": 0.0, "a2": 0.0}
+        new_world = distribute_radiance(world, work_weights)
+
+        expected_each = config.RADIANCE_PER_TICK / 2
+        assert new_world.agents["a1"].tokens == pytest.approx(10.0 + expected_each)
+        assert new_world.agents["a2"].tokens == pytest.approx(10.0 + expected_each)
+
+    def test_work_weighted_radiance_dead_agents_excluded(self):
+        """Dead agents get no radiance even if in work_weights."""
+        world = create_world()
+        alive = create_agent("a1", "Ada-0", tokens=10.0)
+        dead = create_agent("a2", "Rex-0", tokens=5.0)
+        dead.alive = False
+        world.agents["a1"] = alive
+        world.agents["a2"] = dead
+
+        # Give dead agent a weight — it should still get nothing
+        work_weights = {"a1": 1.0, "a2": 3.0}
+        new_world = distribute_radiance(world, work_weights)
+
+        # Only a1 is living, so a1 gets all of RADIANCE_PER_TICK
+        assert new_world.agents["a1"].tokens == pytest.approx(10.0 + config.RADIANCE_PER_TICK)
+        assert new_world.agents["a2"].tokens == 5.0
+
+
+class TestBountyPayouts:
+    def _make_world_with_bounty(self, reward=20.0, status="claimed"):
+        world = create_world()
+        world.agents["a1"] = create_agent("a1", "Ada-0", tokens=10.0)
+        world.gravity_pool = 50.0
+        bounty = Bounty(
+            id="b1",
+            description="do something",
+            reward=reward,
+            posted_by="human",
+            posted_tick=0,
+            expires_at_tick=100,
+            status=status,
+            claimed_by="a1",
+        )
+        world.bounties["b1"] = bounty
+        return world
+
+    def test_bounty_payout_transfers_tokens(self):
+        """Bounty reward moves from gravity_pool to agent."""
+        world = self._make_world_with_bounty(reward=20.0)
+
+        new_world = process_bounty_payouts(world, completions=["b1"])
+
+        assert new_world.agents["a1"].tokens == pytest.approx(10.0 + 20.0)
+        assert new_world.gravity_pool == pytest.approx(50.0 - 20.0)
+
+    def test_bounty_payout_marks_completed(self):
+        """Bounty status becomes 'completed'."""
+        world = self._make_world_with_bounty()
+        world.tick = 5
+
+        new_world = process_bounty_payouts(world, completions=["b1"])
+
+        assert new_world.bounties["b1"].status == "completed"
+        assert new_world.bounties["b1"].completed_tick == 5
+        assert new_world.total_bounties_completed == 1
+        assert new_world.agents["a1"].work_count == 1
+        assert new_world.agents["a1"].total_tokens_earned == pytest.approx(20.0)
+
+    def test_bounty_payout_skips_non_claimed(self):
+        """Only bounties with status='claimed' are processed."""
+        world = self._make_world_with_bounty(status="open")
+
+        new_world = process_bounty_payouts(world, completions=["b1"])
+
+        assert new_world.agents["a1"].tokens == 10.0
+        assert new_world.gravity_pool == 50.0
+
+
+class TestServiceTransactions:
+    def _make_world_with_service(self, price=15.0, buyer_tokens=20.0, status="claimed"):
+        world = create_world()
+        world.agents["provider"] = create_agent("provider", "Pro-0", tokens=5.0)
+        world.agents["buyer"] = create_agent("buyer", "Buy-0", tokens=buyer_tokens)
+        service = ServiceListing(
+            id="s1",
+            provider_id="provider",
+            description="some service",
+            price=price,
+            status=status,
+            buyer_id="buyer",
+        )
+        world.services["s1"] = service
+        return world
+
+    def test_service_transaction_transfers_tokens(self):
+        """Price moves from buyer to provider."""
+        world = self._make_world_with_service(price=15.0, buyer_tokens=20.0)
+
+        new_world = process_service_transactions(world, fulfillments=[("s1", "provider", "buyer")])
+
+        assert new_world.agents["provider"].tokens == pytest.approx(5.0 + 15.0)
+        assert new_world.agents["buyer"].tokens == pytest.approx(20.0 - 15.0)
+        assert new_world.services["s1"].status == "fulfilled"
+        assert new_world.total_services_fulfilled == 1
+        assert new_world.agents["provider"].work_count == 1
+        assert new_world.agents["buyer"].work_count == 1
+        assert new_world.agents["provider"].total_tokens_earned == pytest.approx(15.0)
+
+    def test_service_transaction_skipped_if_buyer_broke(self):
+        """No transfer if buyer.tokens < service.price."""
+        world = self._make_world_with_service(price=15.0, buyer_tokens=5.0)
+
+        new_world = process_service_transactions(world, fulfillments=[("s1", "provider", "buyer")])
+
+        assert new_world.agents["provider"].tokens == pytest.approx(5.0)
+        assert new_world.agents["buyer"].tokens == pytest.approx(5.0)
+        assert new_world.services["s1"].status == "claimed"
+        assert new_world.total_services_fulfilled == 0
+
+
+class TestReputation:
+    def test_reputation_delta_applied(self):
+        """Agent reputation increases by delta."""
+        world = create_world()
+        world.agents["a1"] = create_agent("a1", "Ada-0", tokens=10.0)
+        world.agents["a1"].reputation = 2.0
+
+        new_world = apply_reputation(world, reputation_deltas={"a1": 3.0})
+
+        assert new_world.agents["a1"].reputation == pytest.approx(5.0)
+
+    def test_reputation_floor_zero(self):
+        """Reputation cannot go below 0."""
+        world = create_world()
+        world.agents["a1"] = create_agent("a1", "Ada-0", tokens=10.0)
+        world.agents["a1"].reputation = 1.0
+
+        new_world = apply_reputation(world, reputation_deltas={"a1": -5.0})
+
+        assert new_world.agents["a1"].reputation == 0.0
+
+    def test_reputation_dead_agents_unchanged(self):
+        """Dead agents do not receive reputation changes."""
+        world = create_world()
+        dead = create_agent("a1", "Ada-0", tokens=0.0)
+        dead.alive = False
+        dead.reputation = 1.0
+        world.agents["a1"] = dead
+
+        new_world = apply_reputation(world, reputation_deltas={"a1": 5.0})
+
+        assert new_world.agents["a1"].reputation == 1.0
+
+
+class TestDeathSetsLifespan:
+    def test_death_sets_lifespan(self):
+        """When agent dies, lifespan = died_tick - born_tick."""
+        world = create_world()
+        world.tick = 10
+        agent = create_agent("a1", "Ada-0", tokens=0.0, born_tick=3)
+        world.agents["a1"] = agent
+
+        new_world = check_deaths(world)
+
+        assert new_world.agents["a1"].alive is False
+        assert new_world.agents["a1"].died_tick == 10
+        assert new_world.agents["a1"].lifespan == 10 - 3
