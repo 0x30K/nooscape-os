@@ -3,6 +3,10 @@
 Usage:
     python main.py           Fast mode (max speed, no display)
     python main.py --watch   Watch mode (live terminal, 1 tick/sec)
+    python main.py gravity post "task" --reward 10
+    python main.py gravity list
+    python main.py gravity history [--limit 20]
+    python main.py gravity stats
 """
 import argparse
 import signal
@@ -31,6 +35,28 @@ signal.signal(signal.SIGINT, _handle_sigint)
 
 def main():
     parser = argparse.ArgumentParser(description="Nooscape — Proof of Life")
+    subparsers = parser.add_subparsers(dest="subcommand")
+
+    # gravity subcommand — delegates to cli.gravity
+    gravity_parser = subparsers.add_parser("gravity", help="Human bounty interface")
+    gravity_sub = gravity_parser.add_subparsers(dest="gravity_command")
+
+    gp = gravity_sub.add_parser("post")
+    gp.add_argument("description", type=str)
+    gp.add_argument("--reward", type=float, required=True)
+    gp.add_argument("--db", default="nooscape.db")
+
+    gl = gravity_sub.add_parser("list")
+    gl.add_argument("--db", default="nooscape.db")
+
+    gh = gravity_sub.add_parser("history")
+    gh.add_argument("--limit", type=int, default=20)
+    gh.add_argument("--db", default="nooscape.db")
+
+    gs = gravity_sub.add_parser("stats")
+    gs.add_argument("--db", default="nooscape.db")
+
+    # simulation subcommand options (applied when no subcommand given)
     parser.add_argument(
         "--watch", action="store_true",
         help="Watch mode: live terminal display, 1 tick/sec",
@@ -44,6 +70,21 @@ def main():
         help="Start fresh (ignore existing database)",
     )
     args = parser.parse_args()
+
+    # Handle gravity subcommand
+    if args.subcommand == "gravity":
+        from cli.gravity import post_bounty, list_bounties, bounty_history, world_stats
+        if args.gravity_command == "post":
+            post_bounty(args.description, args.reward, args.db)
+        elif args.gravity_command == "list":
+            list_bounties(args.db)
+        elif args.gravity_command == "history":
+            bounty_history(args.db, args.limit)
+        elif args.gravity_command == "stats":
+            world_stats(args.db)
+        else:
+            gravity_parser.print_help()
+        return
 
     # Set random seed if provided
     if args.seed is not None:
