@@ -69,6 +69,10 @@ def main():
         "--fresh", action="store_true",
         help="Start fresh (ignore existing database)",
     )
+    parser.add_argument(
+        "--dashboard", action="store_true",
+        help="Run web dashboard alongside simulation",
+    )
     args = parser.parse_args()
 
     # Handle gravity subcommand
@@ -92,6 +96,20 @@ def main():
         random.seed(args.seed)
 
     console = Console()
+
+    if args.dashboard:
+        import threading
+        import uvicorn
+        from dashboard.app import create_app
+        dash_app = create_app(db_path="nooscape.db")
+        thread = threading.Thread(
+            target=uvicorn.run,
+            args=(dash_app,),
+            kwargs={"host": "0.0.0.0", "port": 8000, "log_level": "error"},
+            daemon=True,
+        )
+        thread.start()
+        console.print("[cyan]Dashboard running at http://localhost:8000[/cyan]")
 
     # Initialize database
     db = Database("nooscape.db")
