@@ -6,3 +6,10 @@ __pycache__/
 .venv/
 .pytest_cache/
 .coverage
+
+# Dashboard
+dashboard/__pycache__/
+
+# Worktrees
+.worktrees/
+worktrees/

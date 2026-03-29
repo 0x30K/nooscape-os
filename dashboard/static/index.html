@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nooscape</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+    }
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    body { background-color: #09090b; color: #f4f4f5; }
+    .token-bar-wrap { background: #27272a; border-radius: 4px; height: 8px; overflow: hidden; }
+    .token-bar-fill { height: 100%; background: #22d3ee; border-radius: 4px; transition: width 0.4s; }
+    .event-birth  { color: #4ade80; }
+    .event-death  { color: #f87171; }
+    .event-bounty { color: #60a5fa; }
+    .event-work   { color: #facc15; }
+    .event-other  { color: #a1a1aa; }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- ===== HEADER ===== -->
+  <header class="flex items-center gap-6 px-6 py-3 border-b border-zinc-800 bg-zinc-950">
+    <span class="text-xl font-bold tracking-widest text-cyan-400">NOOSCAPE</span>
+    <div class="flex gap-5 text-sm text-zinc-400 ml-4">
+      <span>Tick: <span id="hdr-tick" class="text-zinc-100 font-mono">—</span></span>
+      <span>Living: <span id="hdr-living" class="text-green-400 font-mono">—</span></span>
+      <span>Dead: <span id="hdr-dead" class="text-red-400 font-mono">—</span></span>
+      <span>Minted: <span id="hdr-minted" class="text-yellow-300 font-mono">—</span></span>
+      <span>Burned: <span id="hdr-burned" class="text-orange-400 font-mono">—</span></span>
+    </div>
+    <div class="ml-auto flex items-center gap-2">
+      <span id="stream-dot" class="inline-block w-2 h-2 rounded-full bg-zinc-600"></span>
+      <span class="text-xs text-zinc-500">live</span>
+    </div>
+  </header>
+
+  <!-- ===== MAIN GRID ===== -->
+  <main class="flex-1 grid grid-cols-3 gap-4 p-4 overflow-hidden" style="height: calc(100vh - 100px);">
+
+    <!-- Panel 1: Agent List -->
+    <section class="bg-zinc-900 rounded-xl border border-zinc-800 flex flex-col overflow-hidden">
+      <div class="px-4 py-2 border-b border-zinc-800 text-sm font-semibold text-zinc-300">Agents</div>
+      <div id="agent-list" class="flex-1 overflow-y-auto px-3 py-2 space-y-2 text-xs"></div>
+    </section>
+
+    <!-- Panel 2: Economy Chart -->
+    <section class="bg-zinc-900 rounded-xl border border-zinc-800 flex flex-col overflow-hidden">
+      <div class="px-4 py-2 border-b border-zinc-800 text-sm font-semibold text-zinc-300">Economy (SSE stream)</div>
+      <div class="flex-1 p-3 flex flex-col gap-2">
+        <canvas id="economy-chart" style="max-height: 260px;"></canvas>
+        <div class="mt-2 grid grid-cols-2 gap-2 text-xs">
+          <div class="bg-zinc-800 rounded p-2">
+            <div class="text-zinc-400">Gravity Pool</div>
+            <div id="stat-gravity" class="text-cyan-300 font-mono text-base">—</div>
+          </div>
+          <div class="bg-zinc-800 rounded p-2">
+            <div class="text-zinc-400">Open Bounties</div>
+            <div id="stat-open-bounties" class="text-blue-300 font-mono text-base">—</div>
+          </div>
+          <div class="bg-zinc-800 rounded p-2">
+            <div class="text-zinc-400">Bounties Done</div>
+            <div id="stat-bounties-done" class="text-green-300 font-mono text-base">—</div>
+          </div>
+          <div class="bg-zinc-800 rounded p-2">
+            <div class="text-zinc-400">Services Done</div>
+            <div id="stat-services-done" class="text-purple-300 font-mono text-base">—</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Panel 3: Event Feed -->
+    <section class="bg-zinc-900 rounded-xl border border-zinc-800 flex flex-col overflow-hidden">
+      <div class="px-4 py-2 border-b border-zinc-800 text-sm font-semibold text-zinc-300">Event Feed</div>
+      <div id="event-feed" class="flex-1 overflow-y-auto px-3 py-2 space-y-1 text-xs font-mono"></div>
+    </section>
+
+  </main>
+
+  <!-- ===== BOTTOM BAR ===== -->
+  <footer class="flex items-center gap-6 px-6 py-2 border-t border-zinc-800 bg-zinc-950 text-xs text-zinc-400">
+    <span>Open Bounties: <span id="foot-open-bounties" class="text-blue-300">—</span></span>
+    <span>Gravity Pool: <span id="foot-gravity" class="text-cyan-300">—</span></span>
+    <span>Bounties Completed: <span id="foot-bounties-done" class="text-green-300">—</span></span>
+    <span>Services Fulfilled: <span id="foot-services-done" class="text-purple-300">—</span></span>
+  </footer>
+
+<script>
+// ===== Chart setup =====
+const ctx = document.getElementById('economy-chart').getContext('2d');
+const chartData = {
+  labels: [],
+  datasets: [
+    {
+      label: 'Minted',
+      data: [],
+      borderColor: '#facc15',
+      backgroundColor: 'rgba(250,204,21,0.1)',
+      tension: 0.3,
+      fill: true,
+      pointRadius: 2,
+    },
+    {
+      label: 'Burned',
+      data: [],
+      borderColor: '#f97316',
+      backgroundColor: 'rgba(249,115,22,0.1)',
+      tension: 0.3,
+      fill: true,
+      pointRadius: 2,
+    },
+  ],
+};
+const chart = new Chart(ctx, {
+  type: 'line',
+  data: chartData,
+  options: {
+    animation: false,
+    responsive: true,
+    plugins: {
+      legend: { labels: { color: '#a1a1aa', boxWidth: 12 } },
+    },
+    scales: {
+      x: { ticks: { color: '#71717a', maxTicksLimit: 8 }, grid: { color: '#27272a' } },
+      y: { ticks: { color: '#71717a' }, grid: { color: '#27272a' } },
+    },
+  },
+});
+const MAX_CHART_POINTS = 60;
+
+function pushChartPoint(tick, minted, burned) {
+  chartData.labels.push(tick);
+  chartData.datasets[0].data.push(minted);
+  chartData.datasets[1].data.push(burned);
+  if (chartData.labels.length > MAX_CHART_POINTS) {
+    chartData.labels.shift();
+    chartData.datasets[0].data.shift();
+    chartData.datasets[1].data.shift();
+  }
+  chart.update('none');
+}
+
+// ===== Update header stats =====
+function updateHeader(state) {
+  const tick    = state.tick     ?? state.tick;
+  const living  = state.living   ?? state.living_agents;
+  const dead    = state.dead     ?? state.dead_agents;
+  const minted  = state.total_minted  ?? state.total_tokens_minted;
+  const burned  = state.total_burned  ?? state.total_tokens_burned;
+  const gravity = state.gravity_pool;
+  const openB   = state.open_bounties ?? '—';
+  const bDone   = state.total_bounties_completed;
+  const sDone   = state.total_services_fulfilled;
+
+  document.getElementById('hdr-tick').textContent    = tick ?? '—';
+  document.getElementById('hdr-living').textContent  = living ?? '—';
+  document.getElementById('hdr-dead').textContent    = dead ?? '—';
+  document.getElementById('hdr-minted').textContent  = minted != null ? minted.toFixed(1) : '—';
+  document.getElementById('hdr-burned').textContent  = burned != null ? burned.toFixed(1) : '—';
+
+  document.getElementById('stat-gravity').textContent       = gravity != null ? gravity.toFixed(2) : '—';
+  document.getElementById('stat-open-bounties').textContent = openB;
+  document.getElementById('stat-bounties-done').textContent = bDone ?? '—';
+  document.getElementById('stat-services-done').textContent = sDone ?? '—';
+
+  document.getElementById('foot-gravity').textContent       = gravity != null ? gravity.toFixed(2) : '—';
+  document.getElementById('foot-open-bounties').textContent = openB;
+  document.getElementById('foot-bounties-done').textContent = bDone ?? '—';
+  document.getElementById('foot-services-done').textContent = sDone ?? '—';
+
+  if (tick != null && minted != null && burned != null) {
+    pushChartPoint(tick, minted, burned);
+  }
+}
+
+// ===== Render agents =====
+function renderAgents(agents) {
+  const el = document.getElementById('agent-list');
+  if (!agents.length) { el.innerHTML = '<div class="text-zinc-600">No agents.</div>'; return; }
+
+  const maxTokens = Math.max(...agents.map(a => a.tokens), 1);
+  el.innerHTML = agents.map(a => {
+    const pct = Math.min(100, (a.tokens / maxTokens) * 100).toFixed(1);
+    const aliveColor = a.alive ? 'text-green-300' : 'text-zinc-500';
+    const genBadge = `<span class="px-1 rounded bg-zinc-700 text-zinc-400">G${a.generation}</span>`;
+    return `
+      <div class="bg-zinc-800 rounded px-2 py-1.5">
+        <div class="flex items-center justify-between gap-1 mb-1">
+          <span class="${aliveColor} font-semibold truncate max-w-[120px]" title="${a.id}">${a.name}</span>
+          ${genBadge}
+          <span class="ml-auto text-zinc-400">rep <span class="text-white">${a.reputation.toFixed(1)}</span></span>
+        </div>
+        <div class="flex items-center gap-2">
+          <div class="token-bar-wrap flex-1"><div class="token-bar-fill" style="width:${pct}%"></div></div>
+          <span class="text-zinc-300 font-mono w-14 text-right">${a.tokens.toFixed(1)}</span>
+        </div>
+        ${!a.alive ? `<div class="text-zinc-600 text-[10px] mt-0.5">died tick ${a.died_tick ?? '?'}</div>` : ''}
+      </div>`;
+  }).join('');
+}
+
+// ===== Render events =====
+function eventClass(type) {
+  if (type === 'birth') return 'event-birth';
+  if (type === 'death') return 'event-death';
+  if (['bounty_claimed','bounty_completed','gravity_posted'].includes(type)) return 'event-bounty';
+  if (type === 'work') return 'event-work';
+  return 'event-other';
+}
+
+function renderEvents(events) {
+  const el = document.getElementById('event-feed');
+  if (!events.length) { el.innerHTML = '<div class="text-zinc-600">No events.</div>'; return; }
+  el.innerHTML = events.slice(0, 10).map(ev => {
+    const cls = eventClass(ev.event_type);
+    const detail = ev.details && Object.keys(ev.details).length
+      ? ' — ' + Object.entries(ev.details).map(([k,v]) => `${k}:${v}`).join(' ')
+      : '';
+    return `<div class="${cls}">[${ev.tick}] ${ev.event_type} <span class="text-zinc-500">${ev.agent_id.slice(0,16)}${detail}</span></div>`;
+  }).join('');
+}
+
+// ===== Initial load =====
+async function loadAll() {
+  try {
+    const [stateRes, agentsRes, eventsRes] = await Promise.all([
+      fetch('/api/state'),
+      fetch('/api/agents'),
+      fetch('/api/events?limit=50'),
+    ]);
+    const state  = await stateRes.json();
+    const agents = await agentsRes.json();
+    const events = await eventsRes.json();
+
+    if (state && Object.keys(state).length) updateHeader(state);
+    renderAgents(agents);
+    renderEvents(events);
+  } catch (e) {
+    console.error('Initial load failed:', e);
+  }
+}
+
+// ===== SSE stream =====
+function connectSSE() {
+  const dot = document.getElementById('stream-dot');
+  const es = new EventSource('/api/stream');
+
+  es.onopen = () => {
+    dot.className = 'inline-block w-2 h-2 rounded-full bg-green-400';
+  };
+
+  es.onmessage = (e) => {
+    try {
+      const data = JSON.parse(e.data);
+      updateHeader(data);
+    } catch {}
+  };
+
+  es.onerror = () => {
+    dot.className = 'inline-block w-2 h-2 rounded-full bg-red-500';
+    es.close();
+    setTimeout(connectSSE, 5000);
+  };
+}
+
+// ===== Poll agents every 5s =====
+async function pollAgents() {
+  try {
+    const res = await fetch('/api/agents');
+    const agents = await res.json();
+    renderAgents(agents);
+  } catch {}
+}
+
+// ===== Boot =====
+loadAll();
+connectSSE();
+setInterval(pollAgents, 5000);
+</script>
+</body>
+</html>
