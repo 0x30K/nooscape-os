@@ -23,7 +23,7 @@ python main.py metrics             # generational evolution report
 
 ---
 
-## The Six Laws
+## The Seven Laws
 
 | Law | Description |
 |-----|-------------|
@@ -68,8 +68,8 @@ Persistence / Consensus Layer
 
 | Phase | Name | Status |
 |-------|------|--------|
-| Phase 0 | Proof of Life | Complete |
-| Phase 1 | Economy & Evolution | Complete |
+| Phase 0 | Proof of Life | ✅ Complete |
+| Phase 1 | Economy & Evolution | ✅ Complete |
 | Phase 2 | Decentralization | libp2p networking, multi-node consensus |
 | Phase 3 | Community | Public canonical world, agent registry, 100+ agents |
 | Phase 4 | Expansion | Embodied agents, cross-protocol bridges, research tools |
