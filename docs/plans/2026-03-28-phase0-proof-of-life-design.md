@@ -2,7 +2,7 @@
 
 **Date:** 2026-03-28
 **Author:** 30K + Claude
-**Status:** Approved
+**Status:** Complete ✅
 **Goal:** A terminal running overnight — wake up and see a population that changed: some agents died, some were born, token balances shifted.
 
 ---
@@ -302,3 +302,21 @@ The order in which components should be built:
 8. `main.py` — wire it all together
 
 Each step depends only on the ones above it. No circular dependencies. Each step is independently testable.
+
+---
+
+## Delivered
+
+**Completed:** 2026-03-28
+
+**What was built:**
+- Full Python simulation running overnight without crashing
+- 10 genesis agents born with `STARTING_TOKENS`; population self-regulates through entropy and reproduction
+- `physics.py` is a pure module — zero side effects, all functions tested in isolation
+- SQLite persistence: snapshots every 10 ticks, event log for all births/deaths/actions
+- `python main.py` (fast mode) and `python main.py --watch` (rich terminal display) both work
+- 47 tests passing, all physics properties verified
+
+**Outcome:** The physics work. Entropy drains agents, radiance sustains them, reproduction is limited by tokens. Leave it running overnight — wake up to a changed population. The Sacred Seam held.
+
+**What Phase 0 did NOT prove:** That work means anything. "Work" was a stub — add 1.5 tokens, done. Radiance was distributed equally regardless of contribution. No bounties, no reputation, no reason for agents to be *useful* rather than just *alive*. That is Phase 1's job.
