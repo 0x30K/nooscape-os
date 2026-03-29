@@ -24,9 +24,9 @@ WATCH_TICK_DELAY = 1.0            # seconds between ticks in watch mode
 # Phase 1 additions
 GRADUATION_THRESHOLD = 5.0        # reputation required before agent can reproduce
 BOUNTY_LIFETIME = 100             # ticks before an unclaimed bounty expires
-SERVICE_LIFETIME = 50             # ticks before an unfulfilled service listing expires
-MAX_OPEN_BOUNTIES = 20            # maximum concurrent open bounties in the world
-MAX_SERVICES_PER_AGENT = 3       # max service listings one agent can post at once
+SERVICE_LIFETIME = 50             # ticks before an unfulfilled listing expires [enforced Phase 2]
+MAX_OPEN_BOUNTIES = 20            # max concurrent open bounties [enforced Phase 2]
+MAX_SERVICES_PER_AGENT = 3        # max service listings per agent [enforced Phase 2]
 REPUTATION_PER_BOUNTY = 3.0      # reputation gained for completing a bounty
 REPUTATION_PER_SERVICE = 2.0     # reputation gained for fulfilling a service
 REPUTATION_PER_STUB_WORK = 0.5   # reputation gained for basic "work" action

@@ -99,6 +99,15 @@ def think(agent: Agent, world: WorldState, llm: LLMBackend = None) -> str:
     if affordable_service is not None:
         return f"hire_service:{affordable_service.id}"
 
+    # 5b. POST SERVICE: offer a service if wealthy and not already listing one
+    if agent.tokens > config.REPRODUCE_THRESHOLD:
+        has_open_listing = any(
+            s.provider_id == agent.id and s.status == "open"
+            for s in world.services.values()
+        )
+        if not has_open_listing:
+            return "post_service:2.0"
+
     # 6. REST
     return "rest"
 

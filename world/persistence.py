@@ -129,20 +129,7 @@ class Database:
 def get_generation_metrics(db_path: str = "nooscape.db") -> dict:
     """Compute per-generation statistics from the latest snapshot.
 
-    Returns a dict keyed by generation number (int):
-    {
-        0: {
-            "count": int,                # total agents in this generation (living + dead)
-            "alive": int,                # currently living
-            "dead": int,                 # total dead
-            "avg_lifespan": float,       # average ticks lived (dead agents only; None if no dead)
-            "avg_tokens_earned": float,  # average total_tokens_earned
-            "avg_reputation": float,     # average reputation
-        },
-        1: { ... },
-        ...
-    }
-
+    Delegates to world.metrics.generation_report() after loading the world.
     Returns {} if no snapshots exist.
     """
     db = Database(db_path)
@@ -153,37 +140,8 @@ def get_generation_metrics(db_path: str = "nooscape.db") -> dict:
 
     if world is None:
         return {}
-
-    # Group agents by generation
-    from collections import defaultdict
-    groups: dict = defaultdict(list)
-    for agent in world.agents.values():
-        groups[agent.generation].append(agent)
-
-    result = {}
-    for gen, agents in groups.items():
-        alive = [a for a in agents if a.alive]
-        dead = [a for a in agents if not a.alive]
-        dead_with_lifespan = [a for a in dead if a.lifespan is not None]
-
-        avg_lifespan = (
-            sum(a.lifespan for a in dead_with_lifespan) / len(dead_with_lifespan)
-            if dead_with_lifespan
-            else None
-        )
-        avg_tokens_earned = sum(a.total_tokens_earned for a in agents) / len(agents)
-        avg_reputation = sum(a.reputation for a in agents) / len(agents)
-
-        result[gen] = {
-            "count": len(agents),
-            "alive": len(alive),
-            "dead": len(dead),
-            "avg_lifespan": avg_lifespan,
-            "avg_tokens_earned": avg_tokens_earned,
-            "avg_reputation": avg_reputation,
-        }
-
-    return result
+    from world.metrics import generation_report
+    return generation_report(world)
 
 
 def get_bounty_history(db_path: str = "nooscape.db", limit: int = 20) -> list:
